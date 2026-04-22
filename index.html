@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Octoroit Virtual OS</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7dcfff">
+<link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/monitor.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<a id="a11y-skip" href="#desktop" class="sr-only-focusable" data-i18n="a11y.skip">Skip to desktop</a>
+<div id="auth-screen">
+  <div class="auth-container">
+    <div class="auth-logo">OCTOROIT</div>
+    <div id="auth-user-select" class="auth-users"></div>
+    <div id="auth-form" class="hidden">
+      <div class="auth-avatar" id="auth-avatar-display">👤</div>
+      <div class="auth-username" id="auth-username-display">User</div>
+      <input type="password" id="auth-pin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" autocomplete="off" data-i18n-attr="placeholder" data-i18n="auth.pin">
+      <button id="auth-login-btn" data-i18n="auth.login">Unlock</button>
+      <button id="auth-back-btn" class="auth-secondary" data-i18n="auth.back">← Back</button>
+    </div>
+    <div id="auth-create" class="auth-secondary-btn" data-i18n="auth.new_user">+ New User</div>
+    <div id="auth-guest" class="auth-secondary-btn" data-i18n="auth.guest">Guest Session</div>
+    <div id="auth-error" class="auth-error hidden" data-i18n="auth.invalid">Invalid PIN</div>
+  </div>
+</div>
+<div id="boot-screen">
+  <div class="boot-logo">OCTOROIT</div>
+  <div class="boot-progress"><div class="boot-bar"></div></div>
+  <div class="boot-text" data-i18n="boot.init">Initializing Virtual Environment...</div>
+</div>
+<div id="desktop" class="hidden" tabindex="-1">
+  <div id="desktop-icons"></div>
+  <div id="window-container"></div>
+  <div id="widget-layer"></div>
+  <div id="context-menu" class="hidden"></div>
+</div>
+<div id="taskbar" class="hidden">
+  <button id="start-btn" aria-label="Start Menu" data-i18n-attr="aria-label" data-i18n="taskbar.start">⊞</button>
+  <div id="desktop-switcher"></div>
+  <div id="taskbar-apps"></div>
+  <div id="system-tray"><span id="clock"></span></div>
+</div>
+<div id="start-menu" class="hidden">
+  <div class="start-header"><input type="text" id="start-search" placeholder="Search apps..." data-i18n-attr="placeholder" data-i18n="common.search"></div>
+  <div class="start-apps"></div>
+  <div class="start-footer"><span>User</span><span>v1.0.0-web</span></div>
+</div>
+<div id="voice-indicator">🎤 <span data-i18n="a11y.voice_listening">Listening...</span></div>
+<div id="a11y-live" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+<script src="js/db.js"></script>
+<script src="js/core.js"></script>
+<script src="js/services/users.js"></script>
+<script src="js/services/i18n.js"></script>
+<script src="js/services/a11y.js"></script>
+<script src="js/services/widgets.js"></script>
+<script src="js/services/devtools.js"></script>
+<script src="js/apps/terminal.js"></script>
+<script src="js/apps/filemanager.js"></script>
+<script src="js/apps/texteditor.js"></script>
+<script src="js/apps/settings.js"></script>
+<script src="js/apps/calculator.js"></script>
+<script src="js/apps/codeeditor.js"></script>
+<script src="js/apps/browser.js"></script>
+<script src="js/apps/notes.js"></script>
+<script src="js/apps/monitor.js"></script>
+<script src="js/apps/marketplace.js"></script>
+<script src="js/apps/devtools-app.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
