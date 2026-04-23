@@ -1,0 +1,79 @@
+const OctoroitOS = {
+  version: '1.0.0-web',
+  apps: {},
+  windows: new Map(),
+  zIndexCounter: 100,
+  icons: {terminal:'⌨️',files:'📁',settings:'⚙️',editor:'📝',code:'💻',calc:'🔢',browser:'🌐',notes:'📒',monitor:'📊',marketplace:'🛒',devtools:'🛠️',trash:'🗑️',default:'📦'},
+  getIcon(i){return this.icons[i]||this.icons.default},
+  registerApp(n,f){this.apps[n]=f},
+  async launchApp(n,a={}){try{this.audio.play('click');if(!this.apps[n]){this.notify(`App "${n}" not found`,'error');return null}return await this.apps[n](a)}catch(e){console.error(`[App Crash] ${n}:`,e);this.notify(`App "${n}" crashed.`,'error');return null}},
+  permissions:{defaults:{fs:false,notify:false,clipboard:false,network:false},store:{},init(){this.store=OctoroitOS.storage.get('set:permissions')||{}},get(a){return{...this.defaults,...(this.store[a]||{})}},set(a,p){this.store[a]={...this.get(a),...p};OctoroitOS.storage.set('set:permissions',this.store)},check(a,p){return this.get(a)[p]===true},request(a,p){if(this.check(a,p))return true;const g=confirm(`⚠️ Permission Request\n\nApp: "${a}"\nAccess: ${p.toUpperCase()}\n\nAllow?`);if(g){this.set(a,{[p]:true});return true}return false}},
+  audio:{enabled:true,ctx:null,init(){this.enabled=OctoroitOS.storage.get('set:audio')!==false},play(t){if(!this.enabled)return;if(!this.ctx)this.ctx=new(window.AudioContext||window.webkitAudioContext)();const o=this.ctx.createOscillator(),g=this.ctx.createGain();o.connect(g);g.connect(this.ctx.destination);if(t==='boot'){o.frequency.setValueAtTime(440,this.ctx.currentTime);o.frequency.exponentialRampToValueAtTime(880,this.ctx.currentTime+.1);g.gain.setValueAtTime(.08,this.ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,this.ctx.currentTime+.3);o.start();o.stop(this.ctx.currentTime+.3)}else if(t==='click'){o.frequency.setValueAtTime(600,this.ctx.currentTime);g.gain.setValueAtTime(.04,this.ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,this.ctx.currentTime+.05);o.start();o.stop(this.ctx.currentTime+.05)}}},
+  notify(m,t='info',a='system'){
+    try{
+      const id='notif-'+Date.now();
+      const toast=document.createElement('div');
+      toast.className=`toast toast-${t}`;
+      toast.innerHTML=`<strong>${a}</strong><br>${m}`;
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.classList.add('show'),10);
+      setTimeout(()=>{toast.classList.remove('show');setTimeout(()=>toast.remove(),300)},4000);
+      return id;
+    }catch(e){console.warn('[Notify Fallback]',e);return null}
+  },
+  storage:{memory:{},saveTimeout:null,async init(){await OctoroitDB.init();const f=await OctoroitDB.getAll('fs');f.forEach(i=>this.memory[`fs:${i.key}`]=i.value);const s=await OctoroitDB.getAll('settings');s.forEach(i=>this.memory[`set:${i.key}`]=i.value)},_prefix(k){if(k.startsWith('sys:'))return k;return`${OctoroitOS.users?.getNamespace()||'user:guest'}:${k}`},get(k){return this.memory[this._prefix(k)]??null},set(k,v){this.memory[this._prefix(k)]=v;this._sync()},remove(k){delete this.memory[this._prefix(k)];this._sync()},_sync(){clearTimeout(this.saveTimeout);this.saveTimeout=setTimeout(async()=>{if(!OctoroitDB.ready)return;for(const[k,v] of Object.entries(this.memory)){const s=k.startsWith('fs:')?'fs':'settings';const dbKey=k.replace(/^(fs|set):/,'');await OctoroitDB.set(s,dbKey,v)}},400)},async exportAll(){return JSON.stringify(this.memory,null,2)},async importAll(j){try{this.memory=JSON.parse(j);await OctoroitDB.clear('fs');await OctoroitDB.clear('settings');this._sync();return true}catch{return false}}},
+  theme:{current:'dark',themes:{dark:{'--bg-primary':'#0f111a','--bg-secondary':'#1a1d2e','--bg-tertiary':'#24283b','--text-primary':'#c0caf5','--accent':'#7dcfff','--border':'#3b4261'},light:{'--bg-primary':'#ffffff','--bg-secondary':'#f0f2f5','--bg-tertiary':'#e4e6eb','--text-primary':'#1c1e21','--accent':'#1877f2','--border':'#dadde1'},midnight:{'--bg-primary':'#000000','--bg-secondary':'#121212','--bg-tertiary':'#1e1e1e','--text-primary':'#e0e0e0','--accent':'#03dac6','--border':'#333333'}},apply(n){if(!this.themes[n])return;this.current=n;const r=document.documentElement;for(const[k,v] of Object.entries(this.themes[n]))r.style.setProperty(k,v);OctoroitOS.storage.set('set:theme',n);OctoroitOS.notify(OctoroitOS.i18n?.t('notify.theme_changed')||'Theme changed','info')},init(){this.apply(OctoroitOS.storage.get('set:theme')||'dark')}},
+  fs:{cache:{},history:[],historyIndex:-1,maxHistory:50,userHome:'',init(){const u=OctoroitOS.users?.current||'guest';this.userHome=`/home/${u}`;const root=OctoroitOS.storage.get('fs:/');this.cache=root||this._default(u);this._ensureMeta(this.cache);this.save()},_default(u){const h=`/home/${u}`,n=Date.now();return{'/':{type:'dir',children:['home'],meta:{created:n,modified:n}},'/home':{type:'dir',children:[u],meta:{created:n,modified:n}},[h]:{type:'dir',children:['desktop','documents','notes','trash'],meta:{created:n,modified:n}},[`${h}/desktop`]:{type:'dir',children:[],meta:{created:n,modified:n}},[`${h}/documents`]:{type:'dir',children:[],meta:{created:n,modified:n}},[`${h}/notes`]:{type:'dir',children:[],meta:{created:n,modified:n}},[`${h}/trash`]:{type:'dir',children:[],meta:{created:n,modified:n}}}},_ensureMeta(t){for(const p in t){if(!t[p].meta)t[p].meta={created:Date.now(),modified:Date.now(),size:0};if(t[p].type==='file')t[p].meta.size=(t[p].content||'').length}},save(){this._ensureMeta(this.cache);for(const[p,d] of Object.entries(this.cache))OctoroitOS.storage.set(`fs:${p}`,d)},read(p){return this.cache[p]||null},ls(p){const n=this.cache[p];return n&&n.type==='dir'?n.children:[]},write(p,c){const isNew=!this.cache[p];const prev=isNew?null:{...this.cache[p]};this.cache[p]={type:'file',content:c,meta:{created:isNew?Date.now():this.cache[p].meta.created,modified:Date.now(),size:c.length}};this._hist({type:'write',path:p,prev,isNew});this._par(p,true);this.save()},mkdir(p){if(this.cache[p])return;this.cache[p]={type:'dir',children:[],meta:{created:Date.now(),modified:Date.now(),size:0}};this._hist({type:'mkdir',path:p});this._par(p,true);this.save()},move(s,d){if(!this.cache[s]||this.cache[d])return false;const n={...this.cache[s]};delete this.cache[s];this.cache[d]=n;n.meta.modified=Date.now();this._par(s,false);this._par(d,true);this._hist({type:'move',src:s,dest:d});this.save();return true},trash(p){if(p==='/'||p===this.userHome||p.includes('/trash'))return p.includes('/trash')?this.delPerm(p):false;const td=`${this.userHome}/trash`;if(!this.cache[td])this.mkdir(td);const nm=p.split('/').pop();const tp=`${td}/${nm}_${Date.now()}`;const n={...this.cache[p]};n.meta.originalPath=p;n.meta.trashedAt=Date.now();delete this.cache[p];this.cache[tp]=n;this._par(p,false);this._par(tp,true);this._hist({type:'trash',path:p,trashPath:tp});this.save();return true},restore(tp){const n=this.cache[tp];if(!n||!n.meta.originalPath)return false;const o=n.meta.originalPath;delete n.meta.originalPath;delete n.meta.trashedAt;delete this.cache[tp];this.cache[o]=n;this._par(tp,false);this._par(o,true);this.save();return true},delPerm(p){if(!this.cache[p])return false;const n=this.cache[p];if(n.type==='dir'){const st=[p];while(st.length){const c=st.pop();const x=this.cache[c];if(x?.children)x.children.forEach(ch=>st.push(c==='/'?`/${ch}`:`${c}/${ch}`));delete this.cache[c]}}else delete this.cache[p];this._par(p,false);this.save();return true},emptyTrash(){const td=`${this.userHome}/trash`;if(!this.cache[td])return;[...this.cache[td].children].forEach(c=>this.delPerm(`${td}/${c}`));this.cache[td].children=[];this.save();OctoroitOS.notify('Trash emptied','success')},_par(p,add){const pts=p.split('/').filter(Boolean);const nm=pts.pop();const pp='/'+pts.join('/')||'/';const pr=this.cache[pp];if(!pr)return;if(add&&!pr.children.includes(nm))pr.children.push(nm);if(!add)pr.children=pr.children.filter(c=>c!==nm);pr.meta.modified=Date.now()},_hist(a){this.history=this.history.slice(0,this.historyIndex+1);this.history.push(a);if(this.history.length>this.maxHistory)this.history.shift();this.historyIndex=this.history.length-1},undo(){if(this.historyIndex<0)return;const a=this.history[this.historyIndex--];if(a.type==='write'){if(a.isNew)delete this.cache[a.path];else this.cache[a.path]=a.prev}else if(a.type==='mkdir')delete this.cache[a.path];else if(a.type==='move'){this.cache[a.src]=this.cache[a.dest];delete this.cache[a.dest]}else if(a.type==='trash'){this.cache[a.path]=this.cache[a.trashPath];delete this.cache[a.trashPath]}this._ensureMeta(this.cache);this.save();OctoroitOS.notify('Undo','info')},redo(){if(this.historyIndex>=this.history.length-1)return;this.historyIndex++;const a=this.history[this.historyIndex];if(a.type==='write')this.write(a.path,this.cache[a.path]?.content||'');else if(a.type==='mkdir')this.mkdir(a.path);else if(a.type==='move')this.move(a.src,a.dest);else if(a.type==='trash')this.trash(a.path);OctoroitOS.notify('Redo','info')},getProperties(p){const n=this.cache[p];if(!n)return null;return{path:p,name:p.split('/').pop()||'/',type:n.type,size:n.meta.size||0,created:new Date(n.meta.created).toLocaleString(),modified:new Date(n.meta.modified).toLocaleString(),children:n.children?.length||0}}},
+  fileAssociations:{'.txt':'editor','.md':'editor','.js':'code','.html':'code','.css':'code','.json':'code','.log':'terminal','.url':'browser'},
+  openFile(p){const ext='.'+p.split('.').pop().toLowerCase();const app=this.fileAssociations[ext]||'editor';return this.launchApp(app,{path:p})},
+  initDragDrop(){document.addEventListener('dragover',e=>e.preventDefault());document.addEventListener('drop',e=>{e.preventDefault();const paths=JSON.parse(e.dataTransfer.getData('application/x-octoroit-paths')||'[]');paths.forEach(p=>this.fs.trash(p));this.notify(`${paths.length} item(s) trashed`,'success')})},
+  desktops:[{id:0,name:'Workspace 1',windows:[]},{id:1,name:'Workspace 2',windows:[]}],
+  currentDesktop:0,
+  touch:{isDragging:false},
+  switchDesktop(i){if(i<0||i>=this.desktops.length||i===this.currentDesktop)return;const prev=this.currentDesktop;this.currentDesktop=i;this.windows.forEach(w=>{if(w.desktopId===prev)w.el.style.display='none';else if(w.desktopId===i){w.el.style.display='flex';if(w.minimized)w.el.classList.add('minimized')}});this.updateDesktopSwitcher();this.notify(`Switched to ${this.desktops[i].name}`,'info')},
+  updateDesktopSwitcher(){const c=document.getElementById('desktop-switcher');if(!c)return;c.innerHTML='';this.desktops.forEach((d,i)=>{const dot=document.createElement('div');dot.className=`desktop-dot ${i===this.currentDesktop?'active':''}`;dot.title=d.name;dot.onclick=()=>this.switchDesktop(i);c.appendChild(dot)})},
+  wm:{
+    container:null,taskbar:null,activeId:null,
+    init(){this.container=document.getElementById('window-container');this.taskbar=document.getElementById('taskbar-apps')},
+    create({title='Window',width=500,height=350,app='',content='',icon=''}){
+      const id='win-'+Date.now()+Math.random().toString(36).slice(2,6);
+      const win=document.createElement('div');win.className='window';win.id=id;
+      win.style.cssText=`width:${width}px;height:${height}px;left:${60+Math.random()*100}px;top:${40+Math.random()*80}px;z-index:${++OctoroitOS.zIndexCounter}`;
+      win.innerHTML=`<div class="window-header"><span class="window-title"><span style="margin-right:6px">${icon||OctoroitOS.getIcon(app)}</span>${title}</span><div class="window-controls"><button class="win-btn minimize" aria-label="Minimize"></button><button class="win-btn maximize" aria-label="Maximize"></button><button class="win-btn close" aria-label="Close"></button></div></div><div class="window-body">${content}</div><div class="resize-handle"></div>`;
+      this.container.appendChild(win);
+      const w={el:win,title,app,minimized:false,maximized:false,desktopId:OctoroitOS.currentDesktop};
+      OctoroitOS.windows.set(id,w);OctoroitOS.desktops[OctoroitOS.currentDesktop].windows.push(id);
+      this.attachEvents(win,id);this.addTaskbar(id,title);return id;
+    },
+    attachEvents(win,id){
+      const header=win.querySelector('.window-header'),resize=win.querySelector('.resize-handle');
+      win.addEventListener('pointerdown',()=>{this.focus(id);OctoroitOS.touch.isDragging=true});
+      let drag=false,sX,sY,sL,sT;
+      header.addEventListener('pointerdown',e=>{if(e.target.closest('.window-controls'))return;drag=true;sX=e.clientX;sY=e.clientY;sL=win.offsetLeft;sT=win.offsetTop;win.setPointerCapture(e.pointerId)});
+      win.addEventListener('pointermove',e=>{if(!drag)return;win.style.left=(sL+e.clientX-sX)+'px';win.style.top=(sT+e.clientY-sY)+'px'});
+      win.addEventListener('pointerup',e=>{drag=false;OctoroitOS.touch.isDragging=false;this.checkSnap(id,e.clientX,e.clientY)});
+      let rsz=false,rX,rY,rW,rH;
+      resize.addEventListener('pointerdown',e=>{rsz=true;rX=e.clientX;rY=e.clientY;rW=win.offsetWidth;rH=win.offsetHeight;win.setPointerCapture(e.pointerId);e.stopPropagation()});
+      win.addEventListener('pointermove',e=>{if(!rsz)return;win.style.width=Math.max(300,rW+e.clientX-rX)+'px';win.style.height=Math.max(200,rH+e.clientY-rY)+'px'});
+      win.addEventListener('pointerup',()=>rsz=false);
+      win.querySelector('.close').onclick=()=>this.close(id);
+      win.querySelector('.minimize').onclick=()=>this.minimize(id);
+      win.querySelector('.maximize').onclick=()=>this.maximize(id);
+    },
+    checkSnap(id,x,y){
+      const w=OctoroitOS.windows.get(id);if(!w||w.maximized)return;
+      const vw=window.innerWidth,vh=window.innerHeight-48,th=12;let snap=null;
+      if(y<=th)snap={left:0,top:0,width:vw,height:vh};
+      else if(x<=th&&y>=vh-th)snap={left:0,top:vh/2,width:vw/2,height:vh/2};
+      else if(x>=vw-th&&y>=vh-th)snap={left:vw/2,top:vh/2,width:vw/2,height:vh/2};
+      else if(x<=th)snap={left:0,top:0,width:vw/2,height:vh};
+      else if(x>=vw-th)snap={left:vw/2,top:0,width:vw/2,height:vh};
+      if(snap){w.preSnap={w:w.el.offsetWidth,h:w.el.offsetHeight,l:w.el.offsetLeft,t:w.el.offsetTop};w.el.style.transition='all 0.2s cubic-bezier(0.2,0.8,0.2,1)';w.el.style.left=snap.left+'px';w.el.style.top=snap.top+'px';w.el.style.width=snap.width+'px';w.el.style.height=snap.height+'px';setTimeout(()=>w.el.style.transition='',200)}
+    },
+    focus(id){const w=OctoroitOS.windows.get(id);if(!w)return;this.activeId=id;w.el.style.zIndex=++OctoroitOS.zIndexCounter;document.querySelectorAll('.taskbar-item').forEach(t=>t.classList.remove('active'));document.getElementById('tb-'+id)?.classList.add('active')},
+    minimize(id){const w=OctoroitOS.windows.get(id);if(!w)return;w.minimized=!w.minimized;w.el.classList.toggle('minimized',w.minimized)},
+    maximize(id){const w=OctoroitOS.windows.get(id);if(!w)return;if(w.maximized){const s=w.preSnap||{w:500,h:350,l:60,t:40};w.el.style.cssText=`width:${s.w}px;height:${s.h}px;left:${s.l}px;top:${s.t}px;z-index:${w.el.style.zIndex}`;w.maximized=false}else{w.preSnap={w:w.el.offsetWidth,h:w.el.offsetHeight,l:w.el.offsetLeft,t:w.el.offsetTop};w.el.style.cssText=`width:100%;height:calc(100% - var(--taskbar-height));left:0;top:0;z-index:${w.el.style.zIndex}`;w.maximized=true}},
+    close(id){const w=OctoroitOS.windows.get(id);if(!w)return;w.el.classList.add('closing');setTimeout(()=>{w.el.remove();OctoroitOS.windows.delete(id);document.getElementById('tb-'+id)?.remove();const d=OctoroitOS.desktops[w.desktopId];if(d)d.windows=d.windows.filter(wid=>wid!==id)},200)},
+    addTaskbar(id,title){const t=document.createElement('div');t.className='taskbar-item active';t.id='tb-'+id;t.textContent=title;t.onclick=()=>{const w=OctoroitOS.windows.get(id);if(w.minimized)this.minimize(id);this.focus(id)};this.taskbar.appendChild(t)}
+  }
+};
